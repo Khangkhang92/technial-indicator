@@ -1,0 +1,1 @@
+# technial-indicator
