@@ -1,17 +1,17 @@
-from unittest import result
 import pandas as pd
 import pandas_ta as ta
 from sqlalchemy.orm import Session
 from base.db.session import ScopedSession
 from fastapi import FastAPI, Depends
+from webdatamodel.model import IndicatorsResults
 
 
 app = FastAPI()
 
 
-def indicators_caculate(rough_data_by_ticker):
+def indicators_caculate(rough_data_by_ticker, session):
     close = []
-    results = []
+    indicator_results = []
     close_price_d1 = rough_data_by_ticker.d1
     for day in close_price_d1:
         close.append(day["close"])
@@ -24,17 +24,22 @@ def indicators_caculate(rough_data_by_ticker):
     bbands = ta.bbands(close_series).fillna(0)
 
     for index, rsi in enumerate(rsi):
-        result = {}
-        result["stock_id"] = rough_data_by_ticker.stock_id
-        result["ticker"] = rough_data_by_ticker.ticker
-        result["date"] = close_price_d1[index]["date"]
-        result["rsi"] = rsi
-        result["sma7"] = sma7[index]
-        result["sma60"] = sma60[index]
-        result["macd"] = macd.loc[index].to_dict()
-        result["bbands"] = bbands.loc[index].to_dict()
-        results.append(result)
-    return results
+        sma = {}
+        sma["sma7"] = sma7[index]
+        sma["sma60"] = sma60[index]
+        indicator_result = IndicatorsResults(
+            stock_id=rough_data_by_ticker.stock_id,
+            date=close_price_d1[index]["date"],
+            rsi=rsi,
+            sma=sma,
+            macd=macd.loc[index].to_dict(),
+            bbands=bbands.loc[index].to_dict(),
+        )
+        indicator_results.append(indicator_result)
+        print(index)
+    session.bulk_save_objects(indicator_results)
+    session.commit()
+    print(f"caculate for {rough_data_by_ticker.stock_id} is ok")
 
 
 @app.get("/")
@@ -54,9 +59,7 @@ async def root(session: Session = Depends(ScopedSession)):
 
     stockprice_alldata = session.execute(stmt).fetchall()
 
-    result_list = []
     for rough_data_by_ticker in stockprice_alldata:
-        results_by_ticker = indicators_caculate(rough_data_by_ticker)
-        result_list.extend(results_by_ticker)
-    print(len(result_list))
-    return result_list
+        if len(rough_data_by_ticker.d1) >= 60:
+            indicators_caculate(rough_data_by_ticker, session)
+    return {"msg": "sucessful saving data"}
