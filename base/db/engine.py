@@ -2,10 +2,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
 
-
 def get_engine():
     engine = create_engine(
-        'postgresql+psycopg2://postgres:1@localhost:1234/testdb3',
+        "postgresql+psycopg2://postgres:1@localhost:1234/testdb3",
         pool_pre_ping=True,
         poolclass=NullPool,
         executemany_mode="values",
