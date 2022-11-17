@@ -5,6 +5,7 @@ from sqlalchemy import select, update, desc, and_
 from base.db.session import ScopedSession
 from fastapi import FastAPI, Depends
 from webdatamodel.model import IndicatorsResults, AlertCriteria
+from sqlalchemy.dialects.postgresql import insert
 
 
 app = FastAPI()
@@ -163,14 +164,21 @@ def _create_indicators_chart(
             bbands["lower"] = bbands.pop("BBL_5_2.0")
             bbands["bandwidth"] = bbands.pop("BBB_5_2.0")
             bbands["percent"] = bbands.pop("BBP_5_2.0")
-            indicator_result = IndicatorsResults(
-                stock_id=rough_data_by_ticker.stock_id,
-                date=close_price_d1[index]["date"],
-                rsi=rsi,
-                sma=sma,
-                macd=macd,
-                bbands=bbands,
-            )
+            # indicator_result = IndicatorsResults(
+            #     stock_id=rough_data_by_ticker.stock_id,
+            #     date=close_price_d1[index]["date"],
+            #     rsi=rsi,
+            #     sma=sma,
+            #     macd=macd,
+            #     bbands=bbands,
+            # )
+            indicator_result = {}
+            indicator_result["stock_id"] = (rough_data_by_ticker.stock_id,)
+            indicator_result["date"] = (close_price_d1[index]["date"],)
+            indicator_result["rsi"] = (rsi,)
+            indicator_result["sma"] = (sma,)
+            indicator_result["macd"] = (macd,)
+            indicator_result["bbands"] = (bbands,)
             indicator_results.append(indicator_result)
 
     print(f"caculate for {rough_data_by_ticker.stock_id} is ok")
@@ -208,13 +216,26 @@ async def signals(session: Session = Depends(ScopedSession)):
 
 @app.get("/chart")
 async def create_indicator_chart(session: Session = Depends(ScopedSession)):
+    """
+    https://docs.sqlalchemy.org/en/20/dialects/postgresql.html#sqlalchemy.dialects.postgresql.dml.Insert.on_conflict_do_update
+    https://stackoverflow.com/questions/57046011/multiple-inserts-at-a-time-using-sqlalchemy-with-postgres
+    """
     results = []
     stockprice_alldata = _get_stock_prices(session)
     for rough_data_by_ticker in stockprice_alldata:
         if len(rough_data_by_ticker.d1) >= 60:
             result = create_charts(rough_data_by_ticker)
             results.extend(result)
+
     print("saving indicator results")
-    session.bulk_save_objects(results)
-    session.commit()
+
+    insert_stmt = insert(IndicatorsResults, results)
+    # session.bulk_save_objects(results)
+    # session.commit() indicators_results_un
+    # do_update_stmt = insert_stmt.on_conflict_do_update(
+    #             constraint='indicators_results_un',
+    #             set_=results
+    # )
+    # do_update_stmt = insert_stmt.on_conflict_do_nothing()
+    # session.execute(do_update_stmt)
     return {"msg": "sucessful saving data"}

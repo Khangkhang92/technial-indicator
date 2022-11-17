@@ -4,8 +4,8 @@ from sqlalchemy.pool import NullPool
 
 def get_engine():
     engine = create_engine(
-        "postgresql+psycopg2://postgres:1@localhost:1234/testdb3",
-        # "postgresql+psycopg2://postgres:myPassword@10.242.174.31:5432/webapp_db",
+        # "postgresql+psycopg2://postgres:1@localhost:1234/testdb3",
+        "postgresql+psycopg2://postgres:myPassword@10.242.174.31:5432/webapp_db",
         pool_pre_ping=True,
         poolclass=NullPool,
         executemany_mode="values",
