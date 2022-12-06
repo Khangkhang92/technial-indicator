@@ -173,12 +173,12 @@ def _create_indicators_chart(
             #     bbands=bbands,
             # )
             indicator_result = {}
-            indicator_result["stock_id"] = (rough_data_by_ticker.stock_id,)
-            indicator_result["date"] = (close_price_d1[index]["date"],)
-            indicator_result["rsi"] = (rsi,)
-            indicator_result["sma"] = (sma,)
-            indicator_result["macd"] = (macd,)
-            indicator_result["bbands"] = (bbands,)
+            indicator_result["stock_id"] = rough_data_by_ticker.stock_id
+            indicator_result["date"] = close_price_d1[index]["date"]
+            indicator_result["rsi"] = rsi
+            indicator_result["sma"] = sma
+            indicator_result["macd"] = macd
+            indicator_result["bbands"] = bbands
             indicator_results.append(indicator_result)
 
     print(f"caculate for {rough_data_by_ticker.stock_id} is ok")
@@ -226,16 +226,19 @@ async def create_indicator_chart(session: Session = Depends(ScopedSession)):
         if len(rough_data_by_ticker.d1) >= 60:
             result = create_charts(rough_data_by_ticker)
             results.extend(result)
+    a = len(results)        
 
-    print("saving indicator results")
+    print(f"len of  results is {a}")
 
-    insert_stmt = insert(IndicatorsResults, results)
-    # session.bulk_save_objects(results)
-    # session.commit() indicators_results_un
-    # do_update_stmt = insert_stmt.on_conflict_do_update(
-    #             constraint='indicators_results_un',
-    #             set_=results
-    # )
-    # do_update_stmt = insert_stmt.on_conflict_do_nothing()
-    # session.execute(do_update_stmt)
-    return {"msg": "sucessful saving data"}
+    insert_stmt = insert(IndicatorsResults)
+
+    upsert_stmt = insert_stmt.on_conflict_do_update(
+                constraint='indicators_results_un',
+                set_={'rsi': insert_stmt.excluded.rsi,
+                      'sma': insert_stmt.excluded.sma,
+                      'macd': insert_stmt.excluded.macd,
+                      'bbands': insert_stmt.excluded.bbands
+                     }
+    )
+    session.execute(upsert_stmt,results)
+    return {"msg": f"sucessful saving data "}
